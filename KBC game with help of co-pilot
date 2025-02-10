@@ -1,0 +1,97 @@
+import random
+def kbc_game():
+    questions = {
+1: {"question": "What is the capital of France?", "options": ["Berlin", "Paris", "Madrid", "Rome"], "answer": "Paris"},                       #data of the game
+2: {"question": "Which planet is known as the 'Red Planet'?", "options": ["Jupiter", "Mars", "Venus", "Saturn"], "answer": "Mars"},
+3: {"question": "What is the largest mammal in the world?", "options": ["African Elephant", "Blue Whale", "Polar Bear", "Giraffe"], "answer": "Blue Whale"},
+4: {"question": "Who painted the Mona Lisa?", "options": ["Michelangelo", "Leonardo da Vinci", "Raphael", "Donatello"], "answer": "Leonardo da Vinci"},
+5: {"question": "In what year did World War II begin?", "options": ["1939", "1945", "1914", "1929"], "answer": "1939"},
+6: {"question": "What is the chemical symbol for gold?", "options": ["Go", "Ag", "Au", "Fe"], "answer": "Au"},
+7: {"question": "Which country is home to the kangaroo?", "options": ["New Zealand", "Australia", "India", "South Africa"], "answer": "Australia"},
+8: {"question": "What is the smallest continent?", "options": ["Africa", "Asia", "Australia", "Europe"], "answer": "Australia"},
+9: {"question": "Who wrote 'Hamlet'?", "options": ["Charles Dickens", "Jane Austen", "William Shakespeare", "Mark Twain"], "answer": "William Shakespeare"},
+10: {"question": "What is the currency of Japan?", "options": ["Yuan", "Won", "Rupee", "Yen"], "answer": "Yen"},}
+    lifelines = {"50-50": 2 , "audience poll": 1, "expert advice": 1}
+    prize_money = 0                      #in starting prize money is zero
+    question_number = 1                  #question number is one
+
+    print("Kaun Banega Crorepati! Welcome to the game!")
+
+    while question_number <= len(questions):
+        current_question = questions[question_number]
+        print(f"\nQuestion {question_number}:{current_question['question']}")           #how game proceed when it passes to next question
+        for i, option in enumerate(current_question['options']):
+            print(f"{i + 1}. {option}")
+
+        while True:
+            try:
+                choice = input("Your answer(1-4 or 'l' for lifeline):").lower()
+                if choice == 'l':
+                    if any(lifelines.values()):
+                        print("Available lifelines:")
+                        for lifeline, count in lifelines.items():
+                            if count > 0:
+                                print(lifeline)
+                        while True:
+                            chosen_lifeline = input("Choose a lifeline: ").lower()
+                            if chosen_lifeline in lifelines and lifelines[chosen_lifeline] > 0:
+                                lifelines[chosen_lifeline] -= 1
+                                if chosen_lifeline == "50-50":
+                                    incorrect_options = [option for option in current_question['options'] if option != current_question['answer']]
+                                    random.shuffle(incorrect_options)
+                                    print("50-50 : Two incorrect option are removed")
+                                    remaining_options = [current_question['answer']] + incorrect_options[:2]
+                                    random.shuffle(remaining_options)
+                                    for i, option in enumerate(remaining_options):
+                                        print(f"{i + 1}. {option}")
+                                    while True:
+                                        try:
+                                            choice = input("Your answer (1-3):")
+                                            choice_index = int(choice) - 1
+                                            if 0 <= choice_index < len(remaining_options):
+                                                chosen_answer = remaining_options[choice_index]
+                                                break
+                                            else:
+                                                print("Invalid choice. Please enter a number between 1 and 3")
+                                        except ValueError:
+                                            print("Invalid input. Please input a valid number")
+                                    if chosen_answer == current_question['answer']:
+                                        break
+                                    else:
+                                        print("Incorrect answer.")
+                                    return
+                                elif chosen_lifeline == "audience poll":
+                                    print("Audience poll:(Simulated results)")
+                                    print("This is a simulation. Real audience poll are more complex.")
+                                    print("It's not possible to get audience poll in code")
+                                elif chosen_lifeline == "expert advice":
+                                    print("Expert advice: (Simulated)")
+                                    print("The expert is thinking...")
+                                    print("Again Sorry! it's not possible to get expert advice rn")
+                                else:
+                                    print("Invalid lifeline")
+                                break
+                            else:
+                                print("You've used all your lifelines")
+                                print("Please choose an answer")
+                        continue
+                choice_index = int(choice) - 1
+                if 0 <= choice_index < 4:
+                    chosen_answer = current_question['options'][choice_index]
+                    break
+                else:
+                    print("Invalid choice. Please choose number between 1 and 4")
+            except ValueError:
+                print("Invalid.Please enter a number")
+        if chosen_answer == current_question['answer']:
+            print("Correct answer!")
+            prize_money += 1000 * question_number
+            print(f"You've won ${prize_money}")
+            question_number += 1
+        else:
+            print("Incorrect answer.")
+            return      
+        print("\nCOngratulations! You won the game.")
+        print(f" Total prize money: ${prize_money}")
+
+kbc_game()                                 

@@ -1,0 +1,16 @@
+class Library:
+    def __init__(self):
+        self.noBooks = 0   #In starting books are 0
+        self.books = []    #Book counting are empty
+
+    def addBook(self, book):        #method to append books
+        self.books.append(book)     
+        self.noBooks = len(self.books)   #number of books = length of books(means total number of books)
+
+    def showInfo(self):       #Calling method to show number of books in one line
+        print(f"The library has {self.noBooks} books")
+
+l1 = Library()             
+l1.addBook("Harry potter")     
+l1.addBook("Think and grow rich")
+l1.showInfo()             #Shows number of book

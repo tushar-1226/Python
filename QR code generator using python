@@ -1,0 +1,6 @@
+import qrcode as qr             #First import the module
+img = qr.make("https://www.youtube.com/@OfficialTechnoArmy")     #Then in small parantheses paste link of anything you want to generate qr code of either it is text file, photos anything which have links
+
+img.save("TechnoArmy.png")      #Now it save in your local file where your current python code stores in
+
+#Here in QR code generator i've generated a simple qr using qrcode module in python

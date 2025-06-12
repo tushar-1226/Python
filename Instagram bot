@@ -1,0 +1,19 @@
+from instabot import Bot
+bot = Bot()
+bot.login(username="your_username", password="your_password")     #Login your username and password
+
+bot.follow("target_user")         #follows the targeted user
+
+bot.upload_photo("path_to_your_photo.jpg", caption="Your caption here")    #upload photo 
+
+bot.like_user("target_user", amount=5)    #Like
+
+bot.comment("target_user", "Nice post!")   #Comment
+
+bot.send_message("Hello!", ["target_user1", "target_user2"])    #Send message
+
+bot.unfollow("target_user")      #unfollow
+
+bot.block("target_user")        #block
+
+bot.unblock("target_user")       #unblock

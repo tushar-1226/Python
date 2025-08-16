@@ -1,0 +1,289 @@
+import json
+import os
+from datetime import datetime, date
+from rich.console import Console
+from rich.table import Table
+from rich.prompt import Prompt, Confirm
+from rich.panel import Panel
+from rich.text import Text
+
+# --- Configuration ---
+TASKS_FILE = "tasks.json"
+console = Console()
+
+# --- Helper Functions ---
+
+def load_tasks():
+    """Loads tasks from the JSON file. Returns an empty list if the file doesn't exist."""
+    if not os.path.exists(TASKS_FILE):
+        return []
+    try:
+        with open(TASKS_FILE, "r") as f:
+            # The object_hook helps convert date strings back to date objects
+            return json.load(f, object_hook=datetime_parser)
+    except (json.JSONDecodeError, FileNotFoundError):
+        console.print("[bold red]Error reading tasks file or file is empty.[/bold red]")
+        return []
+
+def save_tasks(tasks):
+    """Saves the list of tasks to the JSON file."""
+    try:
+        with open(TASKS_FILE, "w") as f:
+            # The default converter helps handle date objects for JSON serialization
+            json.dump(tasks, f, indent=4, default=date_converter)
+    except IOError as e:
+        console.print(f"[bold red]Could not save tasks: {e}[/bold red]")
+
+def date_converter(o):
+    """Converts datetime.date objects to string format for JSON."""
+    if isinstance(o, date):
+        return o.isoformat()
+    return o
+
+def datetime_parser(dct):
+    """Parses date strings from JSON back into datetime.date objects."""
+    for k, v in dct.items():
+        if k in ['due_date', 'created_at'] and isinstance(v, str):
+            try:
+                dct[k] = datetime.fromisoformat(v).date()
+            except ValueError:
+                pass # Keep original string if parsing fails
+    return dct
+
+# --- Core Task Functions ---
+
+def add_task(tasks):
+    """Prompts user for task details and adds it to the list."""
+    console.print("\n[bold cyan]--- Add a New Task ---[/bold cyan]")
+    description = Prompt.ask("[yellow]Enter task description[/yellow]")
+
+    # Priority selection
+    priority_choices = ["High", "Medium", "Low"]
+    priority = Prompt.ask(
+        "[yellow]Enter priority[/yellow]",
+        choices=priority_choices,
+        default="Medium"
+    )
+
+    # Due date input with validation
+    while True:
+        due_date_str = Prompt.ask("[yellow]Enter due date (YYYY-MM-DD)[/yellow]", default="none")
+        if due_date_str.lower() == 'none':
+            due_date = None
+            break
+        try:
+            due_date = datetime.strptime(due_date_str, "%Y-%m-%d").date()
+            break
+        except ValueError:
+            console.print("[red]Invalid date format. Please use YYYY-MM-DD.[/red]")
+
+    tags_str = Prompt.ask("[yellow]Enter tags (comma-separated, e.g., work,personal)[/yellow]", default="")
+    tags = [tag.strip() for tag in tags_str.split(",") if tag.strip()]
+
+    new_task = {
+        "id": len(tasks) + 1,
+        "description": description,
+        "priority": priority,
+        "due_date": due_date,
+        "tags": tags,
+        "completed": False,
+        "created_at": date.today()
+    }
+    tasks.append(new_task)
+    save_tasks(tasks)
+    console.print(f"\n[bold green]✅ Task '{description}' added successfully![/bold green]")
+    return tasks
+
+def view_tasks(tasks, filter_tag=None):
+    """Displays tasks in a formatted table, with optional filtering by tag."""
+    if not tasks:
+        console.print(Panel("[bold yellow]You have no tasks. Add one to get started![/bold yellow]", expand=False))
+        return
+
+    table = Table(title="Your To-Do List", show_header=True, header_style="bold magenta")
+    table.add_column("ID", style="dim", width=4)
+    table.add_column("Description", min_width=20)
+    table.add_column("Priority", width=10)
+    table.add_column("Due Date", width=12)
+    table.add_column("Tags", width=15)
+    table.add_column("Status", width=10)
+
+    filtered_tasks = tasks
+    if filter_tag:
+        filtered_tasks = [task for task in tasks if filter_tag in task.get('tags', [])]
+        table.title = f"Tasks Tagged With: #{filter_tag}"
+        if not filtered_tasks:
+            console.print(f"[yellow]No tasks found with the tag '{filter_tag}'.[/yellow]")
+            return
+
+    # Sort tasks: incomplete first, then by due date (earliest first)
+    filtered_tasks.sort(key=lambda x: (x['completed'], x['due_date'] or date.max))
+
+    today = date.today()
+    for task in filtered_tasks:
+        status = "✅ Done" if task['completed'] else "⏳ Pending"
+        description_text = Text(task['description'])
+
+        # Apply strikethrough if completed
+        if task['completed']:
+            description_text.stylize("strike")
+            row_style = "dim"
+        else:
+            row_style = ""
+
+        # Color coding for due dates
+        due_date_str = str(task['due_date']) if task['due_date'] else "N/A"
+        if not task['completed'] and task['due_date']:
+            if task['due_date'] < today:
+                due_date_str = f"[bold red]{due_date_str} (Overdue)[/bold red]"
+                row_style = "on #400000" # Dark red background for overdue tasks
+            elif task['due_date'] == today:
+                due_date_str = f"[bold yellow]{due_date_str} (Today)[/bold yellow]"
+
+        # Color coding for priority
+        priority_color = {
+            "High": "red",
+            "Medium": "yellow",
+            "Low": "green"
+        }.get(task['priority'], "white")
+        priority_str = f"[{priority_color}]{task['priority']}[/{priority_color}]"
+
+        tags_str = ", ".join(f"#{tag}" for tag in task.get('tags', []))
+
+        table.add_row(
+            str(task['id']),
+            description_text,
+            priority_str,
+            due_date_str,
+            tags_str,
+            status,
+            style=row_style
+        )
+
+    console.print(table)
+
+
+def mark_task_complete(tasks):
+    """Marks a specific task as completed."""
+    view_tasks(tasks)
+    if not any(not t['completed'] for t in tasks):
+        console.print("[yellow]All tasks are already completed![/yellow]")
+        return tasks
+
+    try:
+        task_id = int(Prompt.ask("[yellow]Enter the ID of the task to mark as complete[/yellow]"))
+        task_found = False
+        for task in tasks:
+            if task['id'] == task_id:
+                if task['completed']:
+                    console.print(f"[yellow]Task {task_id} is already marked as complete.[/yellow]")
+                else:
+                    task['completed'] = True
+                    save_tasks(tasks)
+                    console.print(f"\n[bold green]🎉 Task '{task['description']}' marked as complete![/bold green]")
+                task_found = True
+                break
+        if not task_found:
+            console.print(f"[bold red]Error: Task with ID {task_id} not found.[/bold red]")
+    except ValueError:
+        console.print("[bold red]Invalid input. Please enter a number.[/bold red]")
+    return tasks
+
+def delete_task(tasks):
+    """Deletes a task from the list."""
+    view_tasks(tasks)
+    if not tasks:
+        return tasks
+
+    try:
+        task_id = int(Prompt.ask("[yellow]Enter the ID of the task to delete[/yellow]"))
+        
+        task_to_delete = next((task for task in tasks if task['id'] == task_id), None)
+
+        if task_to_delete:
+            if Confirm.ask(f"Are you sure you want to delete task '{task_to_delete['description']}'?"):
+                tasks = [task for task in tasks if task['id'] != task_id]
+                # Re-assign IDs to maintain consistency
+                for i, task in enumerate(tasks):
+                    task['id'] = i + 1
+                save_tasks(tasks)
+                console.print(f"\n[bold green]🗑️ Task {task_id} deleted successfully.[/bold green]")
+            else:
+                console.print("Deletion cancelled.")
+        else:
+            console.print(f"[bold red]Error: Task with ID {task_id} not found.[/bold red]")
+
+    except ValueError:
+        console.print("[bold red]Invalid input. Please enter a number.[/bold red]")
+    return tasks
+
+def show_stats(tasks):
+    """Displays statistics about the tasks."""
+    total_tasks = len(tasks)
+    completed_tasks = sum(1 for task in tasks if task['completed'])
+    pending_tasks = total_tasks - completed_tasks
+    overdue_tasks = sum(1 for task in tasks if not task['completed'] and task.get('due_date') and task['due_date'] < date.today())
+
+    stats_panel = Panel(
+        f"[cyan]Total Tasks:[/cyan] {total_tasks}\n"
+        f"[green]Completed:[/green] {completed_tasks}\n"
+        f"[yellow]Pending:[/yellow] {pending_tasks}\n"
+        f"[red]Overdue:[/red] {overdue_tasks}",
+        title="[bold]Task Analytics[/bold]",
+        border_style="blue"
+    )
+    console.print(stats_panel)
+
+# --- Main Application Logic ---
+
+def print_menu():
+    """Prints the main menu of options."""
+    menu_text = """
+[bold cyan]╔══════════════════════════════════╗[/bold cyan]
+[bold cyan]║         Advanced To-Do List        ║[/bold cyan]
+[bold cyan]╚══════════════════════════════════╝[/bold cyan]
+[bold]Choose an option:[/bold]
+  [green]1.[/green] Add Task
+  [blue]2.[/blue] View All Tasks
+  [yellow]3.[/yellow] Mark Task as Complete
+  [magenta]4.[/magenta] Filter by Tag
+  [red]5.[/red] Delete Task
+  [cyan]6.[/cyan] Show Statistics
+  [bold]7.[/bold] Exit
+    """
+    console.print(Panel(menu_text, expand=False))
+
+
+def main():
+    """Main function to run the to-do list application."""
+    tasks = load_tasks()
+    
+    while True:
+        print_menu()
+        choice = Prompt.ask("[bold]Enter your choice[/bold]", choices=["1", "2", "3", "4", "5", "6", "7"])
+
+        if choice == "1":
+            tasks = add_task(tasks)
+        elif choice == "2":
+            view_tasks(tasks)
+        elif choice == "3":
+            tasks = mark_task_complete(tasks)
+        elif choice == "4":
+            tag = Prompt.ask("[yellow]Enter the tag to filter by[/yellow]")
+            view_tasks(tasks, filter_tag=tag)
+        elif choice == "5":
+            tasks = delete_task(tasks)
+        elif choice == "6":
+            show_stats(tasks)
+        elif choice == "7":
+            console.print("[bold cyan]Goodbye! Saving your tasks.[/bold cyan]")
+            break
+        
+        # Pause for user to see the result before clearing
+        Prompt.ask("\n[dim]Press Enter to continue...[/dim]")
+        # This is a simple way to clear the console for a cleaner experience
+        console.clear()
+
+
+if __name__ == "__main__":
+    main()

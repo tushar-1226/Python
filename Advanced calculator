@@ -1,0 +1,153 @@
+#### pip install rich ########
+#### pip install asteval #####
+
+import math
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
+from rich.table import Table
+from rich.text import Text
+
+# Use asteval for safe evaluation of mathematical expressions
+# It's a secure alternative to the built-in eval()
+try:
+    from asteval import Interpreter
+except ImportError:
+    print("Error: 'asteval' library not found.")
+    exit()
+
+# --- Setup ---
+console = Console()
+aeval = Interpreter() 
+history = []
+
+# --- Helper Functions ---
+
+def populate_math_functions():
+    """
+    Adds safe math functions and constants to the evaluator's symbol table.
+    This defines what functions/variables the user can access.
+    """
+    # Add constants
+    aeval.symtable['pi'] = math.pi
+    aeval.symtable['e'] = math.e
+
+    # Add safe math functions
+    safe_functions = {
+        'sin': math.sin, 'cos': math.cos, 'tan': math.tan,
+        'asin': math.asin, 'acos': math.acos, 'atan': math.atan,
+        'sqrt': math.sqrt, 'log': math.log, 'log10': math.log10,
+        'exp': math.exp, 'abs': abs, 'radians': math.radians,
+        'degrees': math.degrees, 'factorial': math.factorial
+    }
+    for name, func in safe_functions.items():
+        aeval.symtable[name] = func
+
+def show_welcome_message():
+    """Displays a welcome panel with instructions."""
+    welcome_panel = Panel(
+        Text(
+            "Welcome to the Advanced Python Calculator!\n\n"
+            "Type a mathematical expression to get started.\n"
+            "Commands:\n"
+            "  - 'history' to see past calculations.\n"
+            "  - 'help' for a list of functions.\n"
+            "  - 'clear' to reset history.\n"
+            "  - 'exit' or 'quit' to close.",
+            justify="center"
+        ),
+        title="[bold cyan]Advanced Calculator[/bold cyan]",
+        border_style="green"
+    )
+    console.print(welcome_panel)
+
+def show_help():
+    """Displays a help panel with available functions and constants."""
+    help_text = (
+        "[bold]Constants:[/bold]\n"
+        "  pi, e\n\n"
+        "[bold]Functions:[/bold]\n"
+        "  sqrt(x), log(x), log10(x), exp(x)\n"
+        "  sin(r), cos(r), tan(r) (r in radians)\n"
+        "  asin(x), acos(x), atan(x)\n"
+        "  radians(d), degrees(r)\n"
+        "  factorial(n), abs(x)"
+    )
+    help_panel = Panel(
+        help_text,
+        title="[bold yellow]Help & Available Functions[/bold yellow]",
+        border_style="yellow"
+    )
+    console.print(help_panel)
+
+def show_history():
+    """Displays the calculation history in a formatted table."""
+    if not history:
+        console.print("[yellow]No history yet.[/yellow]")
+        return
+
+    table = Table(title="[bold magenta]Calculation History[/bold magenta]")
+    table.add_column("Expression", style="cyan", no_wrap=True)
+    table.add_column("Result", style="green")
+
+    for expr, result in history:
+        table.add_row(expr, str(result))
+
+    console.print(table)
+
+
+# --- Main Application Loop ---
+
+def main():
+    """The main function to run the calculator CLI."""
+    populate_math_functions()
+    show_welcome_message()
+
+    while True:
+        # Use rich's Prompt for a nicer input experience
+        expression = Prompt.ask("[bold]>>>[/bold]")
+
+        # Handle commands
+        if expression.lower() in ['exit', 'quit']:
+            console.print("[bold cyan]Goodbye![/bold cyan]")
+            break
+        elif expression.lower() == 'history':
+            show_history()
+            continue
+        elif expression.lower() == 'help':
+            show_help()
+            continue
+        elif expression.lower() == 'clear':
+            history.clear()
+            console.print("[green]History cleared.[/green]")
+            continue
+        elif not expression.strip():
+            continue
+
+        # Evaluate the mathematical expression
+        try:
+            # Use the safe evaluator
+            result = aeval.eval(expression)
+
+            if result is not None:
+                # Display the result in a panel
+                result_panel = Panel(
+                    Text(str(result), justify="center", style="bold green"),
+                    title="Result",
+                    border_style="blue"
+                )
+                console.print(result_panel)
+                # Add to history
+                history.append((expression, result))
+
+        except Exception as e:
+            error_panel = Panel(
+                Text(f"Error: {e}", justify="center"),
+                title="[bold red]Invalid Expression[/bold red]",
+                border_style="red"
+            )
+            console.print(error_panel)
+
+
+if __name__ == "__main__":
+    main()

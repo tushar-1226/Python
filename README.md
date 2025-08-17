@@ -1,1 +1,1 @@
-This is my first python program
+These are my some python 
